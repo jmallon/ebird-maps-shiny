@@ -22,113 +22,7 @@ shinyServer(function(input, output, session) {
   progress <- shiny::Progress$new()
   progress$set(message="Loading maps/data", value=0)
 
-# First plot --------------------------------------------------------------
-
-  maine <- readOGR("data/maine.geojson", "OGRGeoJSON")
-
-  map <- ggplot2::fortify(maine, region="name")
-
-  map %>%
-    group_by(group, id) %>%
-    ggvis(~long, ~lat) %>%
-    layer_paths(strokeOpacity:=0.15) %>%
-    hide_legend("fill") %>%
-    hide_axis("x") %>% hide_axis("y") %>%
-    set_options(width=400, height=600, keep_aspect=TRUE) %>%
-    bind_shiny("maine")
-
-# Second plot -------------------------------------------------------------
-
-  county_centers <- maine %>%
-    gCentroid(byid=TRUE) %>%
-    data.frame %>%
-    cbind(name=maine$name %>% gsub(" County, ME", "", .) )
-
-  map %>%
-    group_by(group, id) %>%
-    ggvis(~long, ~lat) %>%
-    layer_paths(strokeWidth:=0.25, stroke:="#7f7f7f") %>%
-    layer_points(data=county_centers, x=~x, y=~y, size:=8) %>%
-    layer_text(data=county_centers,
-               x=~x+0.05, y=~y, text:=~name,
-               baseline:="middle", fontSize:=8) %>%
-    hide_legend("fill") %>%
-    hide_axis("x") %>% hide_axis("y") %>%
-    set_options(width=400, height=600, keep_aspect=TRUE) %>%
-    bind_shiny("maine_labels")
-
-# Third plot --------------------------------------------------------------
-
-  me_pop <- read.csv("data/me_pop.csv", stringsAsFactors=FALSE)
-  me_crime <- read.csv("data/me_crime.csv", stringsAsFactors=FALSE)
-
-  crime_1k <- me_crime %>%
-    filter(year==2013) %>%
-    select(1,5:12) %>%
-    left_join(me_pop) %>%
-    mutate(murder_1k=1000*(murder/population_2010),
-           rape_1k=1000*(rape/population_2010),
-           robbery_1k=1000*(robbery/population_2010),
-           aggravated_assault_1k=1000*(aggravated_assault/population_2010),
-           burglary_1k=1000*(burglary/population_2010),
-           larceny_1k=1000*(larceny/population_2010),
-           motor_vehicle_theft_1k=1000*(motor_vehicle_theft/population_2010),
-           arson_1k=1000*(arson/population_2010))
-
-  map %<>% mutate(id=gsub(" County, ME", "", id)) %>%
-    left_join(crime_1k, by=c("id"="county"))
-
-  crime_values <- function(x) {
-    if(is.null(x)) return(NULL)
-    y <- me_crime %>% filter(year==2013, county==x$id) %>% select(1,5:12)
-    sprintf("<table width='100%%'>%s</table>",
-            paste0("<tr><td style='text-align:left'>", names(y),
-                   ":</td><td style='text-align:right'>", format(y),
-                   collapse="</td></tr>"))
-  }
-
-  map %>%
-    group_by(group, id) %>%
-    ggvis(~long, ~lat) %>%
-    layer_paths(fill=input_select(label="Crime:",
-                                  choices=crime_1k %>%
-                                    select(ends_with("1k")) %>%
-                                    colnames %>% sort,
-                                  id="Crime1",
-                                  map=as.name),
-                strokeWidth:=0.5, stroke:="white") %>%
-    scale_numeric("fill", range=c("#bfd3e6", "#8c6bb1" ,"#4d004b")) %>%
-    add_tooltip(crime_values, "hover") %>%
-    add_legend("fill", title="Crime Rate/1K Pop") %>%
-    hide_axis("x") %>% hide_axis("y") %>%
-    set_options(width=400, height=600, keep_aspect=TRUE) %>%
-    bind_shiny("maine_crime_1", "maine_crime_1_ui")
-
-# Fourth plot -------------------------------------------------------------
-
-  map %>%
-    mutate_each(funs(log1p), ends_with("1k")) %>%
-    group_by(group, id) %>%
-    ggvis(~long, ~lat) %>%
-    layer_paths(fill=input_select(label="Crime:",
-                                  choices=crime_1k %>%
-                                    select(ends_with("1k")) %>%
-                                    colnames %>% sort,
-                                  id="Crime2",
-                                  map=as.name),
-                strokeWidth:=0.5, stroke:="black") %>%
-    scale_numeric("fill", trans="quantile",
-                  domain=c(0, crime_1k %>% mutate_each(funs(log1p),
-                                                       ends_with("1k")) %>%
-                             select(ends_with("1k")) %>% max),
-                  range=brewer.pal(9, "BuPu")) %>%
-    add_tooltip(crime_values, "hover") %>%
-    add_legend("fill", title="Crime Rate/1K Pop") %>%
-    hide_axis("x") %>% hide_axis("y") %>%
-    set_options(width=400, height=600, keep_aspect=TRUE)%>%
-    bind_shiny("maine_crime_2", "maine_crime_2_ui")
-
-# Fifth plot --------------------------------------------------------------
+# USA plot --------------------------------------------------------------
 
   us <- readOGR("data/us.geojson", "OGRGeoJSON")
   us <- us[!us$STATEFP %in% c("02", "15", "72"),]
@@ -166,7 +60,7 @@ shinyServer(function(input, output, session) {
     set_options(width=900, height=600, keep_aspect=TRUE) %>%
     bind_shiny("drought")
 
-# Sixth plot --------------------------------------------------------------
+# World plot --------------------------------------------------------------
 
   world <- readOGR("data/ne_50m_admin_0_countries.geojson", layer="OGRGeoJSON")
   world <- world[!world$iso_a3 %in% c("ATA"),]
