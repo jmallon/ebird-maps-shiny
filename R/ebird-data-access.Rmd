@@ -1,0 +1,13 @@
+---
+title: "eBird data access"
+author: "Julie Mallon"
+date: "May 24, 2019"
+output: html_document
+---
+
+```{r}
+# or install the development version from github
+# install.packages("remotes")
+remotes::install_github("CornellLabofOrnithology/auk")
+```
+
